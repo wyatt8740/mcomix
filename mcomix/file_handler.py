@@ -545,7 +545,9 @@ class FileHandler(object):
         else:
             path = self._file_provider.get_directory()
 
-        self.open_file(path, prefs['open first file in prev directory']-1,
+        self.open_file(path, (
+            prefs['open first file in prev archive'] or \
+            prefs['open first file in prev directory'])-1,
                        keep_fileprovider=True)
         return True
 
