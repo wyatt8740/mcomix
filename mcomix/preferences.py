@@ -104,6 +104,7 @@ prefs = {
     'openwith commands': [],  # (label, command) pairs
     'animation mode': constants.ANIMATION_NORMAL,
     'double page autoresize': constants.DOUBLE_PAGE_AUTORESIZE_SIZE,
+    'space between two pages': 2,
 }
 
 def read_preferences_file():

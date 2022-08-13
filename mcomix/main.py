@@ -64,7 +64,7 @@ class MainWindow(Gtk.Window):
         self._last_scroll_destination = constants.SCROLL_TO_START
 
         self.layout = _dummy_layout()
-        self._spacing = 2
+        self._spacing = prefs['space between two pages']
         self._waiting_for_redraw = False
 
         self._image_box = Gtk.HBox(False, 2) # XXX transitional(kept for osd.py)
@@ -1168,6 +1168,10 @@ class MainWindow(Gtk.Window):
         if sys.platform != 'win32':
             self.move(prefs['window x'], prefs['window y'])
         return True
+
+    def update_space(self):
+        self._spacing = prefs['space between two pages']
+        self.draw_image()
 
     def close_program(self, *args):
         if not self.is_fullscreen:

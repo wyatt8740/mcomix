@@ -183,6 +183,10 @@ class _PreferencesDialog(Gtk.Dialog):
         page.add_row(Gtk.Label(_('Page auto-resizing:')),
             self._create_double_page_autoresize_control())
 
+        page.add_row(Gtk.Label(label=_('Space between two pages (in pixels):')),
+            self._create_pref_spinner('space between two pages',
+            1, 0, 2, 1, 2, 0, None))
+
         page.new_section(_('Files'))
 
         page.add_row(self._create_pref_check_button(
@@ -874,6 +878,10 @@ class _PreferencesDialog(Gtk.Dialog):
 
         elif preference == 'max extract threads':
             prefs[preference] = int(value)
+
+        elif preference == 'space between two pages':
+            prefs[preference] = int(value)
+            self._window.update_space()
 
 
     def _entry_cb(self, entry, event=None):
