@@ -46,7 +46,7 @@ class PdfArchive(archive_base.BaseArchive):
         # Try to find optimal DPI.
         cmd = _mudraw_exec + _mudraw_trace_args + ['--', self.archive, str(page_num)]
         log.debug('finding optimal DPI for %s: %s', filename, ' '.join(cmd))
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8')
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, encoding='utf-8', errors='replace')
         max_size = 0
         max_dpi = PDF_RENDER_DPI_DEF
         for line in proc.stdout.splitlines():
