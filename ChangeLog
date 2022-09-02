@@ -11,6 +11,9 @@ In development
 
     - Added option to customize space between pages in double-page mode.
 
+    - Added options to open first file/archive when going backwards to
+      previous archive/directory.
+
 MComix 2.0.2
 Release date: 2022-05-20
 
