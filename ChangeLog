@@ -5,6 +5,8 @@ In development
 
     - Fixed byte/unicode error in library search text field.
 
+    - Fixed DPI detection for PDFs which cannot be decoded using UTF-8.
+
 		FEATURES
 
     - Added option to customize space between pages in double-page mode.
