@@ -7,6 +7,8 @@ In development
 
     - Fixed DPI detection for PDFs which cannot be decoded using UTF-8.
 
+    - Fixed magnifying lens errors when image was rotated.
+
 		FEATURES
 
     - Added option to customize space between pages in double-page mode.

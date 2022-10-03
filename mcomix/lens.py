@@ -224,13 +224,13 @@ class MagnifyingLens(object):
 
         if rotation == 90:
             subpixbuf = subpixbuf.rotate_simple(
-                Gdk.PIXBUF_ROTATE_CLOCKWISE)
+                GdkPixbuf.PixbufRotation.CLOCKWISE)
         elif rotation == 180:
             subpixbuf = subpixbuf.rotate_simple(
-                Gdk.PIXBUF_ROTATE_UPSIDEDOWN)
+                GdkPixbuf.PixbufRotation.UPSIDEDOWN)
         elif rotation == 270:
             subpixbuf = subpixbuf.rotate_simple(
-                Gdk.PIXBUF_ROTATE_COUNTERCLOCKWISE)
+                GdkPixbuf.PixbufRotation.COUNTERCLOCKWISE)
         if prefs['horizontal flip']:
             subpixbuf = subpixbuf.flip(horizontal=True)
         if prefs['vertical flip']:
