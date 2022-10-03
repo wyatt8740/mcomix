@@ -408,7 +408,7 @@ class MainWindow(Gtk.Window):
                 virtual_size[distribution_axis] += size[distribution_axis]
                 virtual_size[alignment_axis] = max(virtual_size[alignment_axis],
                                                    size[alignment_axis])
-            rotation = self._get_size_rotation(*virtual_size)
+            rotation = image_tools.get_size_rotation(*virtual_size)
             rotation = (rotation + prefs['rotation']) % 360
             if rotation in (90, 270):
                 distribution_axis, alignment_axis = alignment_axis, distribution_axis
@@ -568,31 +568,6 @@ class MainWindow(Gtk.Window):
         self.statusbar.set_filesize(filesize)
         self.statusbar.update()
         self.update_title()
-
-    def _get_size_rotation(self, width, height):
-        """ Determines the rotation to be applied.
-        Returns the degree of rotation (0, 90, 180, 270). """
-
-        size_rotation = 0
-
-        if (height > width and
-            prefs['auto rotate depending on size'] in
-                (constants.AUTOROTATE_HEIGHT_90, constants.AUTOROTATE_HEIGHT_270)):
-
-            if prefs['auto rotate depending on size'] == constants.AUTOROTATE_HEIGHT_90:
-                size_rotation = 90
-            else:
-                size_rotation = 270
-        elif (width > height and
-              prefs['auto rotate depending on size'] in
-                (constants.AUTOROTATE_WIDTH_90, constants.AUTOROTATE_WIDTH_270)):
-
-            if prefs['auto rotate depending on size'] == constants.AUTOROTATE_WIDTH_90:
-                size_rotation = 90
-            else:
-                size_rotation = 270
-
-        return size_rotation
 
     def _page_available(self, page):
         """ Called whenever a new page is ready for displaying. """

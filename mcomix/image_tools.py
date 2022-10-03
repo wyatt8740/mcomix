@@ -44,6 +44,7 @@ def rotate_pixbuf(src, rotation):
         return src.rotate_simple(GdkPixbuf.PixbufRotation.COUNTERCLOCKWISE)
     raise ValueError("unsupported rotation: %s" % rotation)
 
+
 def get_fitting_size(source_size, target_size,
                      keep_ratio=True, scale_up=False):
     """ Return a scaled version of <source_size>
@@ -529,6 +530,32 @@ def get_implied_rotation(pixbuf):
     elif orientation == '8':
         return 270
     return 0
+
+
+def get_size_rotation(width, height):
+    """ Determines the rotation to be applied.
+    Returns the degree of rotation (0, 90, 180, 270). """
+
+    size_rotation = 0
+
+    if (height > width and
+        prefs['auto rotate depending on size'] in
+            (constants.AUTOROTATE_HEIGHT_90, constants.AUTOROTATE_HEIGHT_270)):
+
+        if prefs['auto rotate depending on size'] == constants.AUTOROTATE_HEIGHT_90:
+            size_rotation = 90
+        else:
+            size_rotation = 270
+    elif (width > height and
+          prefs['auto rotate depending on size'] in
+            (constants.AUTOROTATE_WIDTH_90, constants.AUTOROTATE_WIDTH_270)):
+
+        if prefs['auto rotate depending on size'] == constants.AUTOROTATE_WIDTH_90:
+            size_rotation = 90
+        else:
+            size_rotation = 270
+
+    return size_rotation
 
 def combine_pixbufs( pixbuf1, pixbuf2, are_in_manga_mode ):
     if are_in_manga_mode:
