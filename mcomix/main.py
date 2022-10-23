@@ -2,7 +2,6 @@
 
 import sys
 import math
-import operator
 import os
 import shutil
 import threading
@@ -35,6 +34,7 @@ from mcomix import message_dialog
 from mcomix import callback
 from mcomix.library import backend, main_dialog
 from mcomix import tools
+from mcomix import box
 from mcomix import layout
 from mcomix import log
 
@@ -427,38 +427,14 @@ class MainWindow(Gtk.Window):
             if prefs['horizontal flip'] and rotation in (0, 180):
                 orientation = tools.vector_opposite(orientation)
 
-            viewport_size = () # dummy
-            prefer_same_size = prefs['double page autoresize'] == constants.DOUBLE_PAGE_AUTORESIZE_SIZE
-            expand_area = False
-            scrollbar_requests = [False] * len(self._scroll)
-            # Visible area size is recomputed depending on scrollbar visibility
-            while True:
-                self._show_scrollbars(scrollbar_requests)
-                new_viewport_size = self.get_visible_area_size()
-                if new_viewport_size == viewport_size:
-                    break
-                viewport_size = new_viewport_size
-                zoom_dummy_size = list(viewport_size)
-                dasize = zoom_dummy_size[distribution_axis] - \
-                    self._spacing * (pixbuf_count - 1)
-                if dasize <= 0:
-                    dasize = 1
-                zoom_dummy_size[distribution_axis] = dasize
-                scaled_sizes = self.zoom.get_zoomed_size(size_list, zoom_dummy_size,
-                    distribution_axis, do_not_transform, prefer_same_size)
-                self.layout = layout.FiniteLayout(scaled_sizes,
-                                                  viewport_size,
-                                                  orientation,
-                                                  self._spacing,
-                                                  expand_area,
-                                                  distribution_axis,
-                                                  alignment_axis)
-                union_scaled_size = self.layout.get_union_box().get_size()
-                scrollbar_requests = list(map(operator.or_, scrollbar_requests,
-                    tools.smaller(viewport_size, union_scaled_size)))
-                if len([_f for _f in scrollbar_requests if _f]) > 1 and not expand_area:
-                    expand_area = True
-                    viewport_size = () # start anew
+            self.layout = layout.FiniteLayout.create_finite_layout(
+                pixbuf_count, orientation, self._spacing, distribution_axis,
+                alignment_axis, self._show_scrollbars, self.get_visible_area_size,
+                lambda zoom_dummy_size: self.zoom.get_zoomed_size(size_list, zoom_dummy_size,
+                distribution_axis, do_not_transform,
+                prefs['double page autoresize'] == constants.DOUBLE_PAGE_AUTORESIZE_SIZE))
+            content_boxes = self.layout.get_content_boxes()
+            scaled_sizes = list(map(box.Box.get_size, content_boxes))
 
             for i in range(pixbuf_count):
                 if do_not_transform[i]:
@@ -498,8 +474,7 @@ class MainWindow(Gtk.Window):
 
             self._main_layout.get_bin_window().freeze_updates()
 
-            self._main_layout.set_size(*union_scaled_size)
-            content_boxes = self.layout.get_content_boxes()
+            self._main_layout.set_size(*(self.layout.get_union_box().get_size()))
             for i in range(pixbuf_count):
                 self._main_layout.move(self.images[i],
                     *content_boxes[i].get_position())

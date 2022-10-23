@@ -1,5 +1,7 @@
 """ Layout. """
 
+import operator
+
 from mcomix import constants
 from mcomix import scrolling
 from mcomix import tools
@@ -7,6 +9,38 @@ from mcomix import box
 
 
 class FiniteLayout(object): # 2D only
+
+    @staticmethod
+    def create_finite_layout(box_count, orientation, spacing,
+        distribution_axis, alignment_axis,
+        scrollbar_update, visible_area_update, sizes_update):
+        viewport_size = () # dummy
+        expand_area = False
+        scrollbar_requests = [False] * 2 # 2D only
+        # Visible area size is recomputed depending on scrollbar visibility
+        while True:
+            scrollbar_update(scrollbar_requests)
+            new_viewport_size = visible_area_update()
+            if new_viewport_size == viewport_size:
+                break
+            viewport_size = new_viewport_size
+            zoom_dummy_size = list(viewport_size)
+            dasize = zoom_dummy_size[distribution_axis] - \
+                spacing * (box_count - 1)
+            if dasize <= 0:
+                dasize = 1
+            zoom_dummy_size[distribution_axis] = dasize
+            scaled_sizes = sizes_update(zoom_dummy_size)
+            result = FiniteLayout(scaled_sizes, viewport_size, orientation,
+                spacing, expand_area, distribution_axis, alignment_axis)
+            union_scaled_size = result.get_union_box().get_size()
+            scrollbar_requests = list(map(operator.or_, scrollbar_requests,
+                tools.smaller(viewport_size, union_scaled_size)))
+            if len([_f for _f in scrollbar_requests if _f]) > 1 and not expand_area:
+                expand_area = True
+                viewport_size = () # start anew
+        return result
+
 
     def __init__(self, content_sizes, viewport_size, orientation, spacing,
         wrap_individually, distribution_axis, alignment_axis):
