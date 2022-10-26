@@ -63,7 +63,7 @@ class MainWindow(Gtk.Window):
         # Remember last scroll destination.
         self._last_scroll_destination = constants.SCROLL_TO_START
 
-        self.layout = _dummy_layout()
+        self.layout = layout.create_dummy_layout()
         self._spacing = prefs['space between two pages']
         self._waiting_for_redraw = False
 
@@ -878,7 +878,7 @@ class MainWindow(Gtk.Window):
         for i in self.images:
             i.clear()
         self._show_scrollbars([False] * len(self._scroll))
-        self.layout = _dummy_layout()
+        self.layout = layout.create_dummy_layout()
         self._main_layout.set_size(*self.layout.get_union_box().get_size())
         self.set_bg_colour(prefs['bg colour'])
 
@@ -1172,10 +1172,6 @@ def main_window():
 def set_main_window(window):
     global __main_window
     __main_window = window
-
-
-def _dummy_layout():
-    return layout.FiniteLayout(((1,1),), (1,1), (1,1), 0, False, 0, 0)
 
 
 # vim: expandtab:sw=4:ts=4

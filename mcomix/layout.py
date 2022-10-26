@@ -234,4 +234,8 @@ class FiniteLayout(object): # 2D only
         return (temp_wb_list, temp_wb_list[0])
 
 
+def create_dummy_layout():
+    return FiniteLayout(((1,1),), (1,1), (1,1), 0, False, 0, 0)
+
+
 # vim: expandtab:sw=4:ts=4
