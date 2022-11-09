@@ -34,6 +34,7 @@ prefs = {
     'default fullscreen': False,
     'zoom mode': constants.ZOOM_MODE_BEST,
     'default manga mode': False,
+    'default pixel art mode': False,
     'lens magnification': 2,
     'lens size': 200,
     'virtual double page for fitting images': constants.SHOW_DOUBLE_AS_ONE_TITLE | \
@@ -51,7 +52,7 @@ prefs = {
     'smart scroll': True,
     'invert smart scroll': False,
     'smart scroll percentage': 0.5,
-    'flip with wheel': True,
+    'flip with wheel': False,
     'store recent file info': True,
     'hide all': False,
     'hide all in fullscreen': True,
@@ -99,12 +100,17 @@ prefs = {
     'max extract threads': 1,
     'wrap mouse scroll': False,
     'scaling quality': 2,  # GdkPixbuf.InterpType.BILINEAR
+    'pil scaling filter': -1, # Use a PIL filter (just lanczos for now) in main viewing area. -1 to just use GdkPixbuf
+    'color managed display icc profile': False,
+    'color management enabled': False,
+    'managed color rendering intent': 0, # PIL.ImageCms.INTENT_PERCEPTUAL
     'escape quits': False,
     'fit to size mode': constants.ZOOM_MODE_HEIGHT,
     'fit to size px': 1800,
     'scan for new books on library startup': True,
     'openwith commands': [],  # (label, command) pairs
     'animation mode': constants.ANIMATION_NORMAL,
+    'userstyle': None,  # None to disable userstyle
     'double page autoresize': constants.DOUBLE_PAGE_AUTORESIZE_SIZE,
     'space between two pages': 2,
 }

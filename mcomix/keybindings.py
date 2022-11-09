@@ -96,6 +96,8 @@ BINDING_INFO = {
 
     'double_page' : { 'title': _('Double page mode'), 'group': _('View mode') },
     'manga_mode' : { 'title': _('Manga mode'), 'group': _('View mode') },
+    'pixel_art_mode' : { 'title': _('Pixel art mode'), 'group': _('View mode') },
+
     'invert_scroll' : { 'title': _('Invert smart scroll'), 'group': _('View mode') },
 
     'lens' : { 'title': _('Magnifying lens'), 'group': _('View mode') },

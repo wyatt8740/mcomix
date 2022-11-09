@@ -52,7 +52,10 @@ class ThumbnailSidebar(Gtk.ScrolledWindow):
         self._treeview.connect('drag_data_get', self._drag_data_get)
         self._treeview.connect('row-activated', self._row_activated_event)
         self._treeview.connect('button_press_event', self._mouse_press_event)
+        self._treeview.set_events(self._treeview.get_events() & (Gdk.EventMask)(~Gdk.EventMask.SMOOTH_SCROLL_MASK))
 
+        # disable smooth scroll...
+        self.set_events(self.get_events() & (Gdk.EventMask)(~Gdk.EventMask.SMOOTH_SCROLL_MASK))
 
         # enable drag and dropping of images from thumbnail bar to some file
         # manager

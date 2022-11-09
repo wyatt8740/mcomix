@@ -4,14 +4,19 @@ import operator
 from gi.repository import GLib, GdkPixbuf, Gdk, Gtk
 import PIL
 from PIL import Image
+from PIL import ImageCms
 from PIL import ImageEnhance
 from PIL import ImageOps
-from io import StringIO
+from io import StringIO, BytesIO
 
 from mcomix.preferences import prefs
 from mcomix import constants
 from mcomix import log
 from mcomix import tools
+
+import base64
+
+# from pathlib import Path # to check if files exist
 
 PIL_VERSION = ('Pillow', PIL.__version__)
 
@@ -30,6 +35,57 @@ assert MISSING_IMAGE_ICON
 
 GTK_GDK_COLOR_BLACK = Gdk.color_parse('black')
 GTK_GDK_COLOR_WHITE = Gdk.color_parse('white')
+
+# kill zip bomb warnings from PIL
+Image.MAX_IMAGE_PIXELS = None
+
+
+# to test if profile has been changed and matrices need updated
+cur_profile_name = prefs['color managed display icc profile']
+cur_render_intent = prefs['managed color rendering intent']
+# transformations for bog standard rgb images with no built-in profile
+# information. These can be re-used until the profile name is changed.
+
+# pre-built 'thunks' to massively accelerate correction calculations on
+# images that don't have embedded colour profiles (assumes they are sRGB,
+# similarly to how Firefox now does):
+default_srgb_profile = ImageCms.createProfile("sRGB", -1)
+default_srgb_rgba_xform = ImageCms.buildTransform(
+            default_srgb_profile,
+            prefs['color managed display icc profile'],
+            'RGBA', 'RGBA',
+            prefs['managed color rendering intent']
+        )
+default_srgb_rgb_xform = None
+default_srgb_rgb_xform = ImageCms.buildTransform(
+            default_srgb_profile,
+            prefs['color managed display icc profile'],
+            'RGB', 'RGB',
+            prefs['managed color rendering intent']
+        )
+
+def update_xforms():
+    global cur_profile_name
+    global cur_render_intent
+    global default_srgb_profile
+    global default_srgb_rgba_xform
+    global default_srgb_rgb_xform
+    if bool(prefs['color management enabled']):
+        if (cur_profile_name != prefs['color managed display icc profile'] or cur_render_intent != prefs['managed color rendering intent']):
+            default_srgb_rgba_xform = ImageCms.buildTransform(
+                default_srgb_profile,
+                prefs['color managed display icc profile'],
+                'RGBA', 'RGBA',
+                prefs['managed color rendering intent']
+            )
+            default_srgb_rgb_xform = ImageCms.buildTransform(
+                default_srgb_profile,
+                prefs['color managed display icc profile'],
+                'RGB', 'RGB',
+                prefs['managed color rendering intent']
+            )
+            cur_profile_name = prefs['color managed display icc profile']
+            cur_render_intent = prefs['managed color rendering intent']
 
 
 def rotate_pixbuf(src, rotation):
@@ -76,7 +132,7 @@ def fit_pixbuf_to_rectangle(src, rect, rotation):
                             keep_ratio=False,
                             scale_up=True)
 
-def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotation=0, scaling_quality=None):
+def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotation=0, scaling_quality=None, pil_filter=None):
     """Scale (and return) a pixbuf so that it fits in a rectangle with
     dimensions <width> x <height>. A negative <width> or <height>
     means an unbounded dimension - both cannot be negative.
@@ -90,9 +146,12 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
     If <keep_ratio> is True, the image ratio is kept, and the result
     dimensions may be smaller than the target dimensions.
 
+    If <pil_filter> is not None, a filter from PIL will be used to
+    resample the image.
+
     If <src> has an alpha channel it gets a checkboard background.
     """
-    # "Unbounded" really means "bounded to 10000 px" - for simplicity.
+    # "Unbounded" really means "bounded to 100000 px" - for simplicity.
     # MComix would probably choke on larger images anyway.
     if width < 0:
         width = 100000
@@ -110,6 +169,14 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
     if scaling_quality is None:
         scaling_quality = prefs['scaling quality']
 
+    if pil_filter is None:
+        pil_filter = prefs['pil scaling filter']
+
+    if prefs['default pixel art mode']:
+        # this overrides all other filtering options
+        scaling_quality = GdkPixbuf.InterpType.NEAREST
+        pil_filter = False
+
     src_width = src.get_width()
     src_height = src.get_height()
 
@@ -122,17 +189,90 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
         if prefs['checkered bg for transparent images']:
             check_size, color1, color2 = 8, 0x777777, 0x999999
         else:
-            check_size, color1, color2 = 1024, 0xFFFFFF, 0xFFFFFF
+#            check_size, color1, color2 = 1024, 0xFFFFFF, 0xFFFFFF
+# wyatt: transparency should be background colour as set in prefs instead of hardcoded white
+#            check_size, color1, color2 = 1024, 0xFFFFFF, 0xFFFFFF
+            # convert the floating point decimal format colour list to a
+            # hexadecimal colour code. Uses bitwise shifting and bitwise OR.
+            r,g,b,a = [int(p*255) for p in prefs['bg colour']]
+# hack
+# targetted 0a0a0a, got 0b0b0b. good enough
+#            if bool(prefs['color management enabled']):
+#                bgcol = 5<<16 | 3<<8 | 8 # hex(r<<16 | g<<8 | b)
+#            else:
+            bgcol = r<<16 | g<<8 | b # hex(r<<16 | g<<8 | b)
+            check_size, color1, color2 = 1024, bgcol, bgcol
         if width == src_width and height == src_height:
             # Using anything other than nearest interpolation will result in a
             # modified image if no resizing takes place (even if it's opaque).
             scaling_quality = GdkPixbuf.InterpType.NEAREST
-        src = src.composite_color_simple(width, height, scaling_quality,
-                                         255, check_size, color1, color2)
-    elif width != src_width or height != src_height:
-        src = src.scale_simple(width, height, scaling_quality)
+#        src = src.composite_color_simple(width, height, scaling_quality,
+#                                         255, check_size, color1, color2)
 
+            src = src.composite_color_simple(width, height, scaling_quality,
+                                             255, check_size, color1, color2)
+        elif pil_filter == -1: # scale; use GDK PixBuf only
+            src = src.composite_color_simple(width, height, scaling_quality,
+                                             255, check_size, color1, color2)
+        else:
+            # use PIL filter and then composite. Since PIL already resized,
+            # use NEAREST for the composition step.
+            src = pil_to_pixbuf(pixbuf_to_pil(src).resize(
+                [width,height], resample=pil_filter)).composite_color_simple(
+                    width, height, GdkPixbuf.InterpType.NEAREST, 255,
+                    check_size, color1, color2)
+
+#   elif width != src_width or height != src_height:
+#       src = src.scale_simple(width, height, scaling_quality)
+    elif width != src_width or height != src_height: # opaque and needs resized
+        if pil_filter == -1:
+            src = src.scale_simple(width, height, scaling_quality)
+        else:
+            src = pil_to_pixbuf(
+                pixbuf_to_pil(src).resize([width,height],resample=pil_filter))
     src = rotate_pixbuf(src, rotation)
+
+    ################ 3D LUT CODE #######################
+
+    im = pixbuf_to_pil(src)
+
+    if bool(prefs['color management enabled']) and bool(prefs['color managed display icc profile']):
+        if im.info.get('icc_profile') is None:
+            # Fall back on sRGB if no profile is embedded. Either RGB or RGBA mode.
+            # (images will be converted to fit).
+            icc_in = default_srgb_profile
+        else:
+            icc_in = BytesIO(im.info.get('icc_profile'))
+
+        # handles indexed / black and white, and grayscale images
+        # this function's source currently does nothing if source and destination match.
+        im=im.convert('RGBA' if src.get_has_alpha() else 'RGB') # chooses RGB or RGBA appropriately
+        # im=im.convert('RGB' if src.get_has_alpha() else 'RGBA')
+
+        if icc_in == default_srgb_profile:
+            # do any necessary transform regenerations based on pref changes
+            update_xforms()
+            color_xform = default_srgb_rgba_xform if src.get_has_alpha() else default_srgb_rgb_xform
+
+        # need to apply any color corrections _after_ resize is completed, since
+        # the LUT is supposed to be the final step before being drawn on-screen.
+        # Unfortunately, this means another pixbuf -> pil -> pixbuf transform.
+        # create a transform
+
+        # (NOTE: maybe there should be a global one for sRGB, since it's so
+        # common, just to avoid having to regenerate the conversion  matrix it
+        # on every image.
+        if icc_in != default_srgb_profile:
+            color_xform = ImageCms.buildTransform(icc_in,
+                                                  prefs['color managed display icc profile'],
+                                                  im.mode, im.mode,
+                                                  prefs['managed color rendering intent'])
+
+        ImageCms.applyTransform(im, color_xform, inPlace=True)
+
+    src = pil_to_pixbuf(im)
+
+    ############### END 3D LUT CODE ####################
 
     return src
 
@@ -265,6 +405,12 @@ def get_most_common_edge_colour(pixbufs, edge=2):
 
 def pil_to_pixbuf(im, keep_orientation=False):
     """Return a pixbuf created from the PIL <im>."""
+    # if there's an ICC profile, we need to make it into base64 so it can
+    # be preserved as pixbuf metadata (which is all strings).
+    profile=None
+    if im.info.get('icc_profile') is not None:
+        profile=base64.b64encode(im.info.get('icc_profile'))
+
     if im.mode.startswith('RGB'):
         has_alpha = im.mode == 'RGBA'
     elif im.mode in ('LA', 'P'):
@@ -290,6 +436,9 @@ def pil_to_pixbuf(im, keep_orientation=False):
             orientation = _get_png_implied_rotation(im)
         if orientation is not None:
             setattr(pixbuf, 'orientation', str(orientation))
+        # need to take the ICC profile along for the ride by attaching it to the returned pixbuf.
+        if profile is not None:
+            setattr(pixbuf, 'icc-profile', str(profile))
     return pixbuf
 
 def pixbuf_to_pil(pixbuf):
@@ -299,6 +448,10 @@ def pixbuf_to_pil(pixbuf):
     pixels = pixbuf.get_pixels()
     mode = 'RGBA' if pixbuf.get_has_alpha() else 'RGB'
     im = Image.frombuffer(mode, dimensions, pixels, 'raw', mode, stride, 1)
+    # make sure ICC profile metadata survives conversion every time
+    profile=pixbuf.get_option('icc-profile')
+    if profile is not None:
+        im.info['icc_profile']=base64.b64decode(profile) # not sure if I can do this, but it's Python, so probably.
     return im
 
 def is_animation(pixbuf):
@@ -317,19 +470,20 @@ def unwrap_image(image):
     if image is None:
         return None
     t = image.get_storage_type()
-    if t == Gtk.IMAGE_EMPTY:
+#    if t == Gtk.IMAGE_EMPTY:
+    if t == Gtk.ImageType.EMPTY:
         return None
-    if t == Gtk.IMAGE_PIXBUF:
+    if t == Gtk.ImageType.PIXBUF:
         return image.get_pixbuf()
-    if t == Gtk.IMAGE_ANIMATION:
+    if t == Gtk.ImageType.ANIMATION:
         return image.get_animation()
-    if t == Gtk.IMAGE_PIXMAP:
+    if t == Gtk.ImageType.PIXMAP:
         return image.get_pixmap()
-    if t == Gtk.IMAGE_IMAGE:
+    if t == Gtk.ImageType.IMAGE:
         return image.get_image()
-    if t == Gtk.IMAGE_STOCK:
+    if t == Gtk.ImageType.STOCK:
         return image.get_stock()
-    if t == Gtk.IMAGE_ICON_SET:
+    if t == Gtk.ImageType.ICON_SET:
         return image.get_icon_set()
     raise ValueError()
 
@@ -405,6 +559,15 @@ def load_pixbuf_size(path, width, height):
                     if image_width <= width and image_height <= height:
                         width, height = image_width, image_height
                     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(path, width, height)
+#                   out = GdkPixbuf.Pixbuf.new_from_file_at_size(path, width, height)
+#                   del pixbuf
+#                   gc.collect()
+#                   return out
+#               out = fit_in_rectangle(pixbuf, width, height,
+#                                 scaling_quality=GdkPixbuf.InterpType.BILINEAR)
+#        del pixbuf
+#        gc.collect()
+#        return out
             elif provider == constants.IMAGEIO_PIL:
                 im = Image.open(path)
                 im.draft(None, (width, height))
@@ -682,6 +845,8 @@ def get_supported_formats():
         for name in (
             'MPEG',
             'PDF',
+            'PS',
+            'PSD'
         ):
             if name in supported_formats_pil:
                 del supported_formats_pil[name]

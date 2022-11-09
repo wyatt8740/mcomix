@@ -5,6 +5,10 @@
 import operator
 from gi.repository import Gdk, GdkPixbuf, Gtk, GObject
 
+from PIL import Image    # for PIL interpolation prefs
+import PIL.ImageCms      # for color management rendering intent prefs
+from pathlib import Path # to check if files exist
+
 from mcomix.preferences import prefs
 from mcomix import preferences_page
 from mcomix import image_tools
@@ -39,12 +43,15 @@ class _PreferencesDialog(Gtk.Dialog):
         self.set_border_width(4)
         notebook.set_border_width(6)
 
+        # moved by wyatt
+        display = self._init_display_tab()
+        notebook.append_page(display, Gtk.Label(label=_('Display')))
         appearance = self._init_appearance_tab()
         notebook.append_page(appearance, Gtk.Label(label=_('Appearance')))
         behaviour = self._init_behaviour_tab()
         notebook.append_page(behaviour, Gtk.Label(label=_('Behaviour')))
-        display = self._init_display_tab()
-        notebook.append_page(display, Gtk.Label(label=_('Display')))
+        # display = self._init_display_tab()
+        # notebook.append_page(display, Gtk.Label(label=_('Display')))
         advanced = self._init_advanced_tab()
         notebook.append_page(advanced, Gtk.Label(label=_('Advanced')))
         shortcuts = self.shortcuts = self._init_shortcuts_tab()
@@ -71,6 +78,10 @@ class _PreferencesDialog(Gtk.Dialog):
             _('Escape key closes program'), 'escape quits',
             _('When active, the ESC key closes the program, instead of only '
               'disabling fullscreen mode.')))
+
+        page.add_row(Gtk.Label(label=_('User theme')),
+                     self._create_pref_path_chooser('userstyle', default=None)
+        )
 
         page.new_section(_('Background'))
 
@@ -264,6 +275,19 @@ class _PreferencesDialog(Gtk.Dialog):
 
         page.add_row(Gtk.Label(label=_('Scaling mode')),
             self._create_scaling_quality_combobox())
+
+        page.add_row(Gtk.Label(label=_('High-quality scaling for main area')),
+            self._create_pil_scaling_filter_combobox())
+
+        page.add_row(self._create_pref_check_button(
+            _('Use color management in main window'),
+            'color management enabled',
+            _('Master control to turn a display profile on/off. Must be on for other items in this section to apply.')))
+        page.add_row(Gtk.Label(label=_('Display Color Profile')),
+            self._create_pref_path_chooser('color managed display icc profile', default=None)
+        )
+        page.add_row(Gtk.Label(label=_('Color rendering intent:')),
+            self._create_color_rendering_intent_combobox())
 
         return page
 
@@ -632,7 +656,8 @@ class _PreferencesDialog(Gtk.Dialog):
         items = (
                 (_('Normal (fast)'), int(GdkPixbuf.InterpType.TILES)),
                 (_('Bilinear'), int(GdkPixbuf.InterpType.BILINEAR)),
-                (_('Hyperbolic (slow)'), int(GdkPixbuf.InterpType.HYPER)))
+                (_('Hyperbolic (slow)'), int(GdkPixbuf.InterpType.HYPER)),
+                (_('Nearest-Neighbour'), int(GdkPixbuf.InterpType.NEAREST)))
 
         selection = prefs['scaling quality']
 
@@ -652,6 +677,64 @@ class _PreferencesDialog(Gtk.Dialog):
 
             if value != last_value:
                 self._window.draw_image()
+
+    def _create_pil_scaling_filter_combobox(self):
+        ''' Creates combo box for PIL filter to scale with in main view '''
+        items = (
+                (_('Off'), -1), # -1 defers to 'scaling quality'
+                (_('Lanczos'), int(PIL.Image.LANCZOS)), # PIL type 1.
+                (_('Bicubic'), int(PIL.Image.BICUBIC)),
+                (_('Hamming'), int(PIL.Image.HAMMING)),
+                (_('Box'), int(PIL.Image.BOX)))
+
+
+        selection = prefs['pil scaling filter']
+
+        box = self._create_combobox(items, selection, self._pil_scaling_filter_changed_cb)
+        box.set_tooltip_text(
+            _('If set, a scaling filter from PIL will be preferred over the "scaling quality" selection, in the main view only. This will impact performance.'))
+
+        return box
+
+    def _pil_scaling_filter_changed_cb(self, combobox, *args):
+        ''' Called when PIL filter selection changes. '''
+        iter = combobox.get_active_iter()
+        if combobox.get_model().iter_is_valid(iter):
+            value = combobox.get_model().get_value(iter, 1)
+            last_value = prefs['pil scaling filter']
+            prefs['pil scaling filter'] = value
+
+            if value != last_value:
+                self._window.draw_image()
+
+    def _create_color_rendering_intent_combobox(self):
+        '''Creates combo box for color rendering intent selection'''
+        items = (
+                (_('Perceptual'), int(PIL.ImageCms.INTENT_PERCEPTUAL)), # type 0
+                (_('Relative Colorimetric'), int(PIL.ImageCms.INTENT_RELATIVE_COLORIMETRIC)), # type 1
+                (_('Saturation'), int(PIL.ImageCms.INTENT_SATURATION)), # type 2
+                (_('Absolute Colorimetric'), int(PIL.ImageCms.INTENT_ABSOLUTE_COLORIMETRIC))) # type 3
+        
+        selection = prefs['managed color rendering intent']
+
+        box = self._create_combobox(items, selection, self._color_rendering_intent_changed_cb)
+        box.set_tooltip_text(
+            _('If an ICC profile has been selected, MComix will apply color corrections for accurate display. Rendering intent selects which processing method is most suitable for your needs. This option has no effect if no color profile has been selected.')
+        )
+
+        return box
+
+    def _color_rendering_intent_changed_cb(self, combobox, *args):
+        ''' Called when color rendering intent selection changes. '''
+        iter = combobox.get_active_iter()
+        if combobox.get_model().iter_is_valid(iter):
+            value = combobox.get_model().get_value(iter, 1)
+            last_value = prefs['managed color rendering intent']
+            prefs['managed color rendering intent'] = value
+
+            if value != last_value:
+                self._window.draw_image()
+
 
     def _create_animation_mode_combobox(self):
         """ Creates combo box for animation mode """
@@ -802,7 +885,7 @@ class _PreferencesDialog(Gtk.Dialog):
                 self._window.draw_image()
 
         elif preference in ('checkered bg for transparent images',
-          'no double page for wide images', 'auto rotate from exif'):
+          'no double page for wide images', 'auto rotate from exif', 'color management enabled', 'cube lut enabled'):
             self._window.draw_image()
 
         elif (preference == 'hide all in fullscreen' and
@@ -900,6 +983,68 @@ class _PreferencesDialog(Gtk.Dialog):
         extensions = [e.strip() for e in text.split(',')]
         prefs['comment extensions'] = [e for e in extensions if e]
         self._window.filehandler.update_comment_extensions()
+
+    def _create_pref_path_chooser(self, preference, folder=False, default=None):
+        ''' Select path as preference value '''
+        box = Gtk.Box()
+        action = Gtk.FileChooserAction.SELECT_FOLDER if folder else Gtk.FileChooserAction.OPEN
+
+        chooser = Gtk.Button()
+        chooser.set_label(prefs[preference] or default or _('(default)'))
+        chooser.connect('clicked', self._path_chooser_cb,
+                        chooser, action, preference, default)
+        reset = Gtk.Button(label=_('reset'))
+        reset.connect('clicked', self._path_chooser_reset_cb,
+                      chooser, preference, default)
+        box.add(chooser)
+        box.add(reset)
+
+        return box
+
+
+    def _path_chooser_cb(self, widget, chooser, chooser_action, preference, default):
+        ''' Callback for path chooser '''
+        dialog = Gtk.FileChooserDialog(
+            title=_('Please choose a folder'),
+            action=chooser_action
+        )
+        dialog.set_transient_for(self)
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            _('Select'),
+            Gtk.ResponseType.OK
+        )
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            prefs[preference]=dialog.get_filename()
+            chooser.set_label(prefs[preference])
+            if preference=='color managed display icc profile':
+                try:
+                    Path(prefs[preference]).resolve(strict=True)
+                except FileNotFoundError:
+                    # doesn't exist, reset to null
+                    prefs[preference]=default
+                self._window.draw_image() # redraw required
+            elif preference=='userstyle':
+                self._window.load_style(path=prefs[preference])
+        dialog.destroy()
+
+
+    def _path_chooser_reset_cb(self, widget, chooser, preference, default):
+        ''' Reset path chooser '''
+        if preference=='color managed display icc profile' and prefs[preference]==default:
+            chooser.set_label(prefs[preference] or _('(default)')) # I don't think these can de-sync, but this is less expensive than a redraw.
+            return
+        prefs[preference]=default
+        chooser.set_label(prefs[preference] or _('(default)'))
+        if preference=='color managed display icc profile':
+            self._window.draw_image() # redraw required
+        elif preference=='userstyle':
+            self._window.load_style()
+
+
 
 def open_dialog(action, window):
     """Create and display the preference dialog."""

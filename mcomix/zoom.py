@@ -9,8 +9,10 @@ from functools import reduce
 IDENTITY_ZOOM = 1.0
 IDENTITY_ZOOM_LOG = 0
 USER_ZOOM_LOG_SCALE1 = 4.0
-MIN_USER_ZOOM_LOG = -20
-MAX_USER_ZOOM_LOG = 12
+#MIN_USER_ZOOM_LOG = -20
+#MAX_USER_ZOOM_LOG = 12
+MIN_USER_ZOOM_LOG = -80
+MAX_USER_ZOOM_LOG = 48
 
 class ZoomModel(object):
     """ Handles zoom and fit modes. """
@@ -39,10 +41,12 @@ class ZoomModel(object):
         self._user_zoom_log = min(max(zoom_log, MIN_USER_ZOOM_LOG), MAX_USER_ZOOM_LOG)
 
     def zoom_in(self):
-        self._set_user_zoom_log(self._user_zoom_log + 1)
+        # self._set_user_zoom_log(self._user_zoom_log + 1)
+        self._set_user_zoom_log(self._user_zoom_log + 0.33) # was originally 1, but it zooms less this way
 
     def zoom_out(self):
-        self._set_user_zoom_log(self._user_zoom_log - 1)
+        # self._set_user_zoom_log(self._user_zoom_log - 1)
+        self._set_user_zoom_log(self._user_zoom_log - 0.33) # originally 1
 
     def reset_user_zoom(self):
         self._set_user_zoom_log(IDENTITY_ZOOM_LOG)

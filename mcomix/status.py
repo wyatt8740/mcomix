@@ -17,6 +17,12 @@ class Statusbar(Gtk.EventBox):
 
         # Status text, page number, file number, resolution, path, filename, filesize
         self.status = Gtk.Statusbar()
+        self.status.get_message_area().set_margin_top(0)
+        self.status.get_message_area().set_margin_bottom(0)
+        self.status.get_message_area().set_margin_start(0)
+        self.status.get_message_area().set_margin_end(0)
+        self.status.set_border_width(0)
+        self.status.get_message_area().set_border_width(0)
         self.add(self.status)
 
         # Create popup menu for enabling/disabling status boxes.

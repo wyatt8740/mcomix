@@ -38,6 +38,7 @@ from mcomix import box
 from mcomix import layout
 from mcomix import log
 
+import gc # memory management :|
 
 class MainWindow(Gtk.Window):
 
@@ -56,6 +57,7 @@ class MainWindow(Gtk.Window):
         # Used to detect window fullscreen state transitions.
         self.was_fullscreen = False
         self.is_manga_mode = False
+        self.is_pixel_art_mode = False
         self.previous_size = (None, None)
         self.was_out_of_focus = False
         #: Used to remember if changing to fullscreen enabled 'Hide all'
@@ -87,6 +89,8 @@ class MainWindow(Gtk.Window):
         self.imagehandler = image_handler.ImageHandler(self)
         self.imagehandler.page_available += self._page_available
         self.thumbnailsidebar = thumbbar.ThumbnailSidebar(self)
+        # if we give it a name, it is easier for me to theme later with CSS
+        self.thumbnailsidebar.set_name("ThumbnailSidebar")
 
         self.statusbar = status.Statusbar()
         self.clipboard = clipboard.Clipboard(self)
@@ -232,7 +236,8 @@ class MainWindow(Gtk.Window):
                                      Gdk.EventMask.BUTTON2_MOTION_MASK |
                                      Gdk.EventMask.BUTTON_PRESS_MASK |
                                      Gdk.EventMask.BUTTON_RELEASE_MASK |
-                                     Gdk.EventMask.POINTER_MOTION_MASK)
+                                     Gdk.EventMask.POINTER_MOTION_MASK &
+                                     (Gdk.EventMask)(~Gdk.EventMask.SMOOTH_SCROLL_MASK))
 
         self._main_layout.drag_dest_set(Gtk.DestDefaults.ALL,
                                         [Gtk.TargetEntry.new('text/uri-list', 0, 0)],
@@ -293,6 +298,48 @@ class MainWindow(Gtk.Window):
                 self.cursor_handler.refresh()
             Gtk.main_do_event(event)
         Gdk.event_handler_set(_on_event)
+
+        self.styleprovider = None
+        self.load_style(prefs['userstyle'])
+
+    def load_style(self, path=None):
+        if not path:
+            return self.reset_style()
+        # load userstyle from path
+        provider=None
+        try:
+            csspath=tools.relpath2root(path)
+            if not csspath:
+                raise Exception('userstyle out of mount point is not allowed.')
+            provider=Gtk.CssProvider.new()
+            provider.load_from_path(csspath)
+        except Exception as e:
+            provider=None
+            text=_('Failed to load userstyle: "{}", {}').format(path,e)
+            log.warning(text)
+            self.osd.show(text)
+        finally:
+            # always reset before setting userstyle
+            self.reset_style()
+
+        if not provider:
+            # failed to load userstyle, stop
+            return
+        self.styleprovider=provider
+        Gtk.StyleContext.add_provider_for_screen(
+            self.get_screen(),
+            self.styleprovider,
+            Gtk.STYLE_PROVIDER_PRIORITY_USER
+        )
+
+    def reset_style(self):
+        # reset to system style
+        if self.styleprovider:
+            Gtk.StyleContext.remove_provider_for_screen(
+                self.get_screen(),
+                self.styleprovider
+            )
+            self.styleprovider=None
 
     def gained_focus(self, *args):
         def _delayed_unset_out_of_focus(_):
@@ -466,7 +513,11 @@ class MainWindow(Gtk.Window):
             smartbg = prefs['smart bg']
             smartthumbbg = prefs['smart thumb bg'] and prefs['show thumbnails']
             if smartbg or smartthumbbg:
-                bg_colour = self.imagehandler.get_pixbuf_auto_background(pixbuf_count)
+                bg_colour = [0.05098039215686275,.06274509803921569,0.03137254901960784,1.0]
+                # bg_colour = self.imagehandler.get_pixbuf_auto_background(pixbuf_count)
+                # wyatt hack: probably should load a 1px image of background
+                # color and check value after applying correction instead
+                
             if smartbg:
                 self.set_bg_colour(bg_colour)
             if smartthumbbg:
@@ -665,7 +716,15 @@ class MainWindow(Gtk.Window):
             new_page = number_of_pages
 
         if new_page != current_page:
-            self.set_page(new_page, at_bottom=(-1 == step))
+            # self.set_page(new_page, at_bottom=(-1 == step))
+            # Always go to same place on the page.
+            # Don't be clever about it.
+            # self.set_page(new_page, at_bottom=(-1 == step))
+            self.set_page(new_page, at_bottom=(False))
+            del new_page
+            # GARBAGE COLLECTION: trying to reel in memory usage.
+            gc.collect(2)
+
 
     def first_page(self):
         number_of_pages = self.imagehandler.get_number_of_pages()
@@ -709,6 +768,11 @@ class MainWindow(Gtk.Window):
         prefs['default manga mode'] = toggleaction.get_active()
         self.is_manga_mode = toggleaction.get_active()
         self._update_page_information()
+        self.draw_image()
+
+    def change_pixel_art_mode(self, toggleaction):
+        prefs['default pixel art mode'] = toggleaction.get_active()
+        self.is_pixel_art_mode = toggleaction.get_active()
         self.draw_image()
 
     def change_invert_scroll(self, toggleaction):
@@ -951,7 +1015,11 @@ class MainWindow(Gtk.Window):
         self._event_box.modify_bg(Gtk.StateType.NORMAL, Gdk.Color(*colour))
         if prefs['thumbnail bg uses main colour']:
             self.thumbnailsidebar.change_thumbnail_background_color(prefs['bg colour'][:3])
-        self._bg_colour = colour
+        # self._bg_colour = colour
+        # wyatt: override background
+        self._bg_color = Gdk.Color(13,16,8)
+        # wyatt added - since bg colour can change with the image due to my tweak
+        self.draw_image()
 
     def get_bg_colour(self):
         return self._bg_colour

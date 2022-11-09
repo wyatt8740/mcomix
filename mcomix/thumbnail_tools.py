@@ -30,6 +30,8 @@ from mcomix import i18n
 from mcomix import callback
 from mcomix import log
 
+# kill zip bomb warnings from PIL
+Image.MAX_IMAGE_PIXELS = None
 
 class Thumbnailer(object):
     """ The Thumbnailer class is responsible for managing MComix
@@ -155,6 +157,11 @@ class Thumbnailer(object):
                     tEXt_data['tEXt::Thumb::MTime'] = str(int(os.stat(filepath).st_mtime))
                 else:
                     tEXt_data = None
+
+#            out=pixbuf
+#            del pixbuf
+#            gc.collect(1)
+#            return out, tEXt_data
 
                 return pixbuf, tEXt_data
             finally:

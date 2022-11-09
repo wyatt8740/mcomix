@@ -10,7 +10,9 @@ import math
 import itertools
 from functools import reduce, cmp_to_key
 
-
+ROOTPATH=os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+_PORTABLE_MODE=[]
+_NOGUI=[]
 NUMERIC_REGEXP = re.compile(r"\d+|\D+")  # Split into numerics and characters
 PREFIXED_BYTE_UNITS = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 
@@ -137,6 +139,46 @@ def garbage_collect():
     else:
         gc.collect()
 
+def rootdir():
+    # return path contains mcomixstarter.py
+    return ROOTPATH
+
+def is_portable_mode():
+    # check if running in portable mode
+    if not _PORTABLE_MODE:
+        portable_file=os.path.join(rootdir(),'portable.txt')
+        _PORTABLE_MODE.append(os.path.exists(portable_file))
+        if _PORTABLE_MODE[0]:
+            # chdir to rootdir early
+            os.chdir(rootdir())
+    return _PORTABLE_MODE[0]
+
+def relpath2root(path,abs_fallback=False):
+    # return relative path to rootdir in portable mode
+    # if path is not under the same mount point where rootdir placed
+    # return abspath of path if abs_fallback is True, else None
+    # but, always return absolue path if not in portable mode
+
+    # ATTENTION:
+    # avoid using os.path.relpath without checking mount point in win32
+    # it will raise ValueError if path has a different driver letter
+    # (see source code of ntpath.relpath)
+
+    path=os.path.abspath(path)
+    if not is_portable_mode():
+        return path
+
+    pathmp=os.path.dirname(path)
+    while not os.path.ismount(pathmp):
+        pathmp=os.path.dirname(pathmp)
+
+    rootmp=rootdir()
+    while not os.path.ismount(rootmp):
+        rootmp=os.path.dirname(rootmp)
+
+    if pathmp==rootmp:
+        return os.path.relpath(path)
+    return path if abs_fallback else None
 
 def div(a, b):
     return float(a) / float(b)
