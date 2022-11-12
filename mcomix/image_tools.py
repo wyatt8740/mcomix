@@ -263,12 +263,17 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
         # common, just to avoid having to regenerate the conversion  matrix it
         # on every image.
         if icc_in != default_srgb_profile:
-            color_xform = ImageCms.buildTransform(icc_in,
-                                                  prefs['color managed display icc profile'],
-                                                  im.mode, im.mode,
-                                                  prefs['managed color rendering intent'])
+            try:
+                color_xform = ImageCms.buildTransform(icc_in,
+                                                      prefs['color managed display icc profile'],
+                                                      im.mode, im.mode,
+                                                      prefs['managed color rendering intent'])
 
-        ImageCms.applyTransform(im, color_xform, inPlace=True)
+                ImageCms.applyTransform(im, color_xform, inPlace=True)
+            except PIL.ImageCms.PyCMSError:
+                print("Error while creating transform! - using a default sRGB one.")
+                color_xform = default_srgb_rgba_xform if src.get_has_alpha() else default_srgb_rgb_xform
+                pass
 
     src = pil_to_pixbuf(im)
 
