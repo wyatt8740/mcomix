@@ -150,7 +150,7 @@ class Thumbnailer(object):
                 if not os.path.isfile(image_path):
                     return None, None
 
-                pixbuf = image_tools.load_pixbuf_size(image_path, self.width, self.height)
+                pixbuf = image_tools.load_pixbuf_size(image_path, self.width, self.height, is_thumb=True)
                 if self.store_on_disk:
                     tEXt_data = self._get_text_data(image_path)
                     # Use the archive's mTime instead of the extracted file's mtime
@@ -169,7 +169,7 @@ class Thumbnailer(object):
                     fn()
 
         elif image_tools.is_image_file(filepath):
-            pixbuf = image_tools.load_pixbuf_size(filepath, self.width, self.height)
+            pixbuf = image_tools.load_pixbuf_size(filepath, self.width, self.height, is_thumb=True)
             if self.store_on_disk:
                 tEXt_data = self._get_text_data(filepath)
             else:

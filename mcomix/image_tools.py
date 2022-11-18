@@ -132,7 +132,7 @@ def fit_pixbuf_to_rectangle(src, rect, rotation):
                             keep_ratio=False,
                             scale_up=True)
 
-def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotation=0, scaling_quality=None, pil_filter=None):
+def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotation=0, scaling_quality=None, pil_filter=None, is_thumb=False):
     """Scale (and return) a pixbuf so that it fits in a rectangle with
     dimensions <width> x <height>. A negative <width> or <height>
     means an unbounded dimension - both cannot be negative.
@@ -235,45 +235,40 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
     ################ 3D LUT CODE #######################
 
     im = pixbuf_to_pil(src)
+    if not is_thumb:
+        if bool(prefs['color management enabled']) and bool(prefs['color managed display icc profile']):
+            if im.info.get('icc_profile') is None:
+                # Fall back on sRGB if no profile is embedded. Either RGB or RGBA mode.
+                # (images will be converted to fit).
+                icc_in = default_srgb_profile
+            else:
+                icc_in = BytesIO(im.info.get('icc_profile'))
+                
+                # handles indexed / black and white, and grayscale images
+                # this function's source currently does nothing if source and destination match.
+                im=im.convert('RGBA' if src.get_has_alpha() else 'RGB') # chooses RGB or RGBA appropriately
+                # im=im.convert('RGB' if src.get_has_alpha() else 'RGBA')
 
-    if bool(prefs['color management enabled']) and bool(prefs['color managed display icc profile']):
-        if im.info.get('icc_profile') is None:
-            # Fall back on sRGB if no profile is embedded. Either RGB or RGBA mode.
-            # (images will be converted to fit).
-            icc_in = default_srgb_profile
-        else:
-            icc_in = BytesIO(im.info.get('icc_profile'))
-
-        # handles indexed / black and white, and grayscale images
-        # this function's source currently does nothing if source and destination match.
-        im=im.convert('RGBA' if src.get_has_alpha() else 'RGB') # chooses RGB or RGBA appropriately
-        # im=im.convert('RGB' if src.get_has_alpha() else 'RGBA')
-
-        if icc_in == default_srgb_profile:
-            # do any necessary transform regenerations based on pref changes
-            update_xforms()
-            color_xform = default_srgb_rgba_xform if src.get_has_alpha() else default_srgb_rgb_xform
-
-        # need to apply any color corrections _after_ resize is completed, since
-        # the LUT is supposed to be the final step before being drawn on-screen.
-        # Unfortunately, this means another pixbuf -> pil -> pixbuf transform.
-        # create a transform
-
-        # (NOTE: maybe there should be a global one for sRGB, since it's so
-        # common, just to avoid having to regenerate the conversion  matrix it
-        # on every image.
-        if icc_in != default_srgb_profile:
-            try:
-                color_xform = ImageCms.buildTransform(icc_in,
-                                                      prefs['color managed display icc profile'],
-                                                      im.mode, im.mode,
-                                                      prefs['managed color rendering intent'])
-
-                ImageCms.applyTransform(im, color_xform, inPlace=True)
-            except PIL.ImageCms.PyCMSError:
-                print("Error while creating transform! - using a default sRGB one.")
+            if icc_in == default_srgb_profile:
+                # do any necessary transform regenerations based on pref changes
+                update_xforms()
                 color_xform = default_srgb_rgba_xform if src.get_has_alpha() else default_srgb_rgb_xform
-                pass
+
+            # need to apply any color corrections _after_ resize is completed, since
+            # the LUT is supposed to be the final step before being drawn on-screen.
+            # Unfortunately, this means another pixbuf -> pil -> pixbuf transform.
+            # create a transform
+
+            # (NOTE: maybe there should be a global one for sRGB, since it's so
+            # common, just to avoid having to regenerate the conversion  matrix it
+            # on every image.
+            if icc_in != default_srgb_profile:
+                color_xform = ImageCms.buildTransform(icc_in,
+                            prefs['color managed display icc profile'],
+                            im.mode, im.mode,
+                            prefs['managed color rendering intent'])
+
+            ImageCms.applyTransform(im, color_xform, inPlace=True)
 
     src = pil_to_pixbuf(im)
 
@@ -408,13 +403,14 @@ def get_most_common_edge_colour(pixbufs, edge=2):
     most_used = group_colors(ungrouped_colors)[:3]
     return [color * 257 for color in most_used]
 
-def pil_to_pixbuf(im, keep_orientation=False):
+def pil_to_pixbuf(im, keep_orientation=False, is_thumb=False):
     """Return a pixbuf created from the PIL <im>."""
-    # if there's an ICC profile, we need to make it into base64 so it can
-    # be preserved as pixbuf metadata (which is all strings).
-    profile=None
-    if im.info.get('icc_profile') is not None:
-        profile=base64.b64encode(im.info.get('icc_profile'))
+    if not is_thumb:
+        # if there's an ICC profile, we need to make it into base64 so it can
+        # be preserved as pixbuf metadata (which is all strings).
+        profile=None
+        if im.info.get('icc_profile') is not None:
+            profile=base64.b64encode(im.info.get('icc_profile'))
 
     if im.mode.startswith('RGB'):
         has_alpha = im.mode == 'RGBA'
@@ -441,9 +437,10 @@ def pil_to_pixbuf(im, keep_orientation=False):
             orientation = _get_png_implied_rotation(im)
         if orientation is not None:
             setattr(pixbuf, 'orientation', str(orientation))
-        # need to take the ICC profile along for the ride by attaching it to the returned pixbuf.
-        if profile is not None:
-            setattr(pixbuf, 'icc-profile', str(profile))
+        if not is_thumb:
+            # need to take the ICC profile along for the ride by attaching it to the returned pixbuf.
+            if profile is not None:
+                setattr(pixbuf, 'icc-profile', str(profile))
     return pixbuf
 
 def pixbuf_to_pil(pixbuf):
@@ -539,7 +536,7 @@ def load_pixbuf(path):
         raise last_error or TypeError()
     return pixbuf
 
-def load_pixbuf_size(path, width, height):
+def load_pixbuf_size(path, width, height, is_thumb=False):
     """ Loads a pixbuf from a given image file and scale it to fit
     inside (width, height). """
     # TODO similar to load_pixbuf, should be merged using callbacks etc.
@@ -576,7 +573,7 @@ def load_pixbuf_size(path, width, height):
             elif provider == constants.IMAGEIO_PIL:
                 im = Image.open(path)
                 im.draft(None, (width, height))
-                pixbuf = pil_to_pixbuf(im, keep_orientation=True)
+                pixbuf = pil_to_pixbuf(im, keep_orientation=True, is_thumb=is_thumb)
             else:
                 raise TypeError()
         except Exception as e:
@@ -590,7 +587,7 @@ def load_pixbuf_size(path, width, height):
     if pixbuf is None:
         # raising necessary because caller expects pixbuf to be not None
         raise last_error or TypeError()
-    return fit_in_rectangle(pixbuf, width, height, GdkPixbuf.InterpType.BILINEAR)
+    return fit_in_rectangle(pixbuf, width, height, GdkPixbuf.InterpType.BILINEAR, is_thumb=is_thumb)
 
 def load_pixbuf_data(imgdata):
     """ Loads a pixbuf from the data passed in <imgdata>. """
