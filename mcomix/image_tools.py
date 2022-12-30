@@ -242,11 +242,11 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
                 # (images will be converted to fit).
                 icc_in = default_srgb_profile
             else:
-                icc_in = BytesIO(im.info.get('icc_profile'))
-                
+                # icc_in = BytesIO(im.info.get('icc_profile'))
+                icc_in = PIL._imagingcms.profile_frombytes(im.info.get('icc_profile'))
                 # handles indexed / black and white, and grayscale images
                 # this function's source currently does nothing if source and destination match.
-                im=im.convert('RGBA' if src.get_has_alpha() else 'RGB') # chooses RGB or RGBA appropriately
+            im=im.convert('RGBA' if src.get_has_alpha() else 'RGB') # chooses RGB or RGBA appropriately
                 # im=im.convert('RGB' if src.get_has_alpha() else 'RGBA')
 
             if icc_in == default_srgb_profile:
@@ -263,10 +263,13 @@ def fit_in_rectangle(src, width, height, keep_ratio=True, scale_up=False, rotati
             # common, just to avoid having to regenerate the conversion  matrix it
             # on every image.
             if icc_in != default_srgb_profile:
-                color_xform = ImageCms.buildTransform(icc_in,
+                try:
+                    color_xform = ImageCms.buildTransform(icc_in,
                             prefs['color managed display icc profile'],
                             im.mode, im.mode,
                             prefs['managed color rendering intent'])
+                except PIL.ImageCms.PyCMSError:
+                    color_xform = default_srgb_rgba_xform if src.get_has_alpha() else default_srgb_rgb_xform
 
             ImageCms.applyTransform(im, color_xform, inPlace=True)
 
@@ -452,6 +455,9 @@ def pixbuf_to_pil(pixbuf):
     im = Image.frombuffer(mode, dimensions, pixels, 'raw', mode, stride, 1)
     # make sure ICC profile metadata survives conversion every time
     profile=pixbuf.get_option('icc-profile')
+    # print(profile)
+    #print('TYPE OF THING IS: ' + str(type(profile)))
+    #print(len(profile))
     if profile is not None:
         im.info['icc_profile']=base64.b64decode(profile) # not sure if I can do this, but it's Python, so probably.
     return im
