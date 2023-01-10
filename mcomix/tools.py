@@ -93,7 +93,7 @@ def get_config_directory():
     else:
         base_path = os.getenv('XDG_CONFIG_HOME',
             os.path.join(get_home_directory(), '.config'))
-        return os.path.join(base_path, 'mcomix')
+        return os.path.join(base_path, os.getenv('MCOMIX_PROFILE_NAME', 'mcomix'))
 
 
 def get_data_directory():
