@@ -4,6 +4,8 @@ import os
 import urllib.request, urllib.parse, urllib.error
 from gi.repository import Gdk, GdkPixbuf, Gtk, GObject
 import PIL.Image as Image
+import jxlpy
+import jxlpy.JXLImagePlugin
 import PIL.ImageDraw as ImageDraw
 
 from mcomix.preferences import prefs

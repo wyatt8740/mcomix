@@ -151,6 +151,14 @@ def run():
         log.error( _('No version of the Python Imaging Library was found on your system.') )
         wait_and_exit()
 
+    try:
+        import jxlpy
+
+    except ImportError:
+        log.error( _('jxlpy is required') )
+        log.error( _('No version of jxlpy was found on your system.') )
+        wait_and_exit()
+
     if not os.path.exists(constants.DATA_DIR):
         os.makedirs(constants.DATA_DIR, 0o700)
 

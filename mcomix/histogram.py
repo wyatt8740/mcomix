@@ -1,6 +1,8 @@
 """histogram.py - Draw histograms (RGB) from pixbufs."""
 
 import PIL.Image as Image
+import jxlpy
+import jxlpy.JXLImagePlugin
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageOps as ImageOps
 

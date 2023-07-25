@@ -5,6 +5,11 @@
 import operator
 from gi.repository import Gdk, GdkPixbuf, Gtk, GObject
 
+# comment next 3 for no jxlpy
+import PIL
+import jxlpy
+import jxlpy.JXLImagePlugin
+# end of comment
 from PIL import Image    # for PIL interpolation prefs
 import PIL.ImageCms      # for color management rendering intent prefs
 from pathlib import Path # to check if files exist

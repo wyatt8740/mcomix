@@ -12,6 +12,8 @@ import itertools
 import traceback
 import locale
 import PIL.Image as Image
+import jxlpy
+import jxlpy.JXLImagePlugin
 from urllib.request import pathname2url
 
 try:  # The md5 module is deprecated as of Python 2.5, replaced by hashlib.

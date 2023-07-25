@@ -3,6 +3,8 @@
 import operator
 from gi.repository import GLib, GdkPixbuf, Gdk, Gtk
 import PIL
+import jxlpy
+import jxlpy.JXLImagePlugin
 from PIL import Image
 from PIL import ImageCms
 from PIL import ImageEnhance
@@ -50,16 +52,19 @@ cur_render_intent = prefs['managed color rendering intent']
 # images that don't have embedded colour profiles (assumes they are sRGB,
 # similarly to how Firefox now does):
 default_srgb_profile = ImageCms.createProfile("sRGB", -1)
+dest_profile = prefs['color managed display icc profile']
+if not dest_profile:
+    dest_profile=default_srgb_profile
 default_srgb_rgba_xform = ImageCms.buildTransform(
             default_srgb_profile,
-            prefs['color managed display icc profile'],
+            dest_profile,
             'RGBA', 'RGBA',
             prefs['managed color rendering intent']
         )
 default_srgb_rgb_xform = None
 default_srgb_rgb_xform = ImageCms.buildTransform(
             default_srgb_profile,
-            prefs['color managed display icc profile'],
+            dest_profile,
             'RGB', 'RGB',
             prefs['managed color rendering intent']
         )
@@ -71,16 +76,17 @@ def update_xforms():
     global default_srgb_rgba_xform
     global default_srgb_rgb_xform
     if bool(prefs['color management enabled']):
+        dest_profile=prefs['color managed display icc profile'] if prefs['color managed display icc profile'] else default_srgb_profile
         if (cur_profile_name != prefs['color managed display icc profile'] or cur_render_intent != prefs['managed color rendering intent']):
             default_srgb_rgba_xform = ImageCms.buildTransform(
                 default_srgb_profile,
-                prefs['color managed display icc profile'],
+                dest_profile,
                 'RGBA', 'RGBA',
                 prefs['managed color rendering intent']
             )
             default_srgb_rgb_xform = ImageCms.buildTransform(
                 default_srgb_profile,
-                prefs['color managed display icc profile'],
+                dest_profile,
                 'RGB', 'RGB',
                 prefs['managed color rendering intent']
             )
