@@ -4,6 +4,8 @@ import sys
 import optparse
 import signal
 
+from packaging.version import parse as parse_version
+
 if __name__ == '__main__':
     print('PROGRAM TERMINATED', file=sys.stderr)
     print('Please do not run this script directly! Use mcomixstarter.py instead.', file=sys.stderr)
@@ -139,8 +141,7 @@ def run():
 
     try:
         import PIL.Image
-
-        if PIL.__version__ < '6.0.0':
+        if parse_version(PIL.__version__) < parse_version('6.0.0'):
             log.error( _("You don't have the required version of the Python Imaging Library Fork (Pillow) installed."))
             log.error( _('Installed Pillow version is: %s') % PIL.__version__ )
             log.error( _('Required Pillow version is: 6.0.0 or higher') )

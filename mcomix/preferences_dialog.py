@@ -715,10 +715,10 @@ class _PreferencesDialog(Gtk.Dialog):
     def _create_color_rendering_intent_combobox(self):
         '''Creates combo box for color rendering intent selection'''
         items = (
-                (_('Perceptual'), int(PIL.ImageCms.INTENT_PERCEPTUAL)), # type 0
-                (_('Relative Colorimetric'), int(PIL.ImageCms.INTENT_RELATIVE_COLORIMETRIC)), # type 1
-                (_('Saturation'), int(PIL.ImageCms.INTENT_SATURATION)), # type 2
-                (_('Absolute Colorimetric'), int(PIL.ImageCms.INTENT_ABSOLUTE_COLORIMETRIC))) # type 3
+                (_('Perceptual'), int(PIL.ImageCms.Intent.PERCEPTUAL)), # type 0
+                (_('Relative Colorimetric'), int(PIL.ImageCms.Intent.RELATIVE_COLORIMETRIC)), # type 1
+                (_('Saturation'), int(PIL.ImageCms.Intent.SATURATION)), # type 2
+                (_('Absolute Colorimetric'), int(PIL.ImageCms.Intent.ABSOLUTE_COLORIMETRIC))) # type 3
         
         selection = prefs['managed color rendering intent']
 
